@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# virtualenv
+_ck/
+
+# client secret file
+client_secret.json
+
 # C extensions
 *.so
 
