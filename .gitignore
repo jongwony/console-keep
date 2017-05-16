@@ -6,8 +6,15 @@ __pycache__/
 # virtualenv
 _ck/
 
-# client secret file
-client_secret.json
+# secret json file
+*.json
+
+# private result
+source.html
+
+# PhantomJS
+ghostdriver.log
+screen.png
 
 # C extensions
 *.so

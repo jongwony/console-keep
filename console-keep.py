@@ -1,51 +1,56 @@
 # -*- coding: utf-8 -*-
 import json
-import time
-import getpass
+import os
 from urllib import parse
+from bs4 import BeautifulSoup
+import re
 
-from oauth2client.client import flow_from_clientsecrets
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
+venv_name = '_ck'
+osdir = 'Scripts' if os.name is 'nt' else 'bin'
+current_dir = os.path.realpath(os.path.dirname(__file__))
+venv = os.path.join(venv_name, osdir, 'activate_this.py')
+activate_this = (os.path.join(current_dir, venv))
+# Python 3: exec(open(...).read()), Python 2: execfile(...)
+exec(open(activate_this).read(), dict(__file__=activate_this))
 
-scope = ['https://www.googleapis.com/auth/calendar']
+from oauth2client import file, client, tools
+
+# TODO: argument parsing
+try:
+    import argparse
+    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
+except ImportError:
+    flags = None
+
+scope = ['https://www.googleapis.com/auth/drive']
 redirect_uri = 'https://keep.google.com'
+store = file.Storage('storage.json')
+creds = store.get()
+if not creds or creds.invalid:
+    flow = client.flow_from_clientsecrets('client_secret.json', scope=scope, redirect_uri=redirect_uri)
+    creds = tools.run_flow(flow, store, flags) if flags else tools.run(flow, store)
 
-flow = flow_from_clientsecrets('client_secret.json', scope=scope, redirect_uri=redirect_uri)
-auth_uri = flow.step1_get_authorize_url()
+###################
 
-#######################
+import httplib2
 
-userID = input('Email: ')
-passwd = getpass.getpass('Password: ')
+http = httplib2.Http()
+http = creds.authorize(http)
 
-driver = webdriver.Chrome(executable_path=r"E:\chromedriver_win32\chromedriver.exe")
-driver.get(auth_uri)
+resp, contents = http.request('https://keep.google.com')
 
-page = driver.find_element_by_id('identifierId')
-page.send_keys(userID)
-page.send_keys(Keys.RETURN)
+# (.*?) shortest matching
+datapat = re.compile(rb"JSON.parse\('(.*?)'\)")
+info = datapat.findall(contents)
 
-time.sleep(1)
+# Hex decoding byte code -> Preserve literal byte(latin1) -> Unicode mapping
+# http://stackoverflow.com/questions/14820429/how-do-i-decodestring-escape-in-python3?answertab=votes#tab-top
+for i in info:
+    convert = i.decode('unicode_escape').encode('latin1').decode('utf-8')
+    print(json.loads(convert))
 
-page = driver.find_element_by_name("password")
-page.send_keys(passwd)
-page.send_keys(Keys.RETURN)
+## TODO: JSON parsing
 
-time.sleep(1)
+# with open('source.html', 'wb') as f:
+#     f.write(contents)
 
-# if len(scope) > 0:
-#     page = driver.find_element_by_id('submit_approve_access')
-#     page.send_keys(Keys.RETURN)
-    
-#     time.sleep(1)
-
-code_url = driver.current_url
-
-driver.close()
-
-################
-
-code = parse.parse_qs(parse.urlparse(code_url).query)['code'][0]
-credentials = flow.step2_exchange(code)
-print(credentials)
